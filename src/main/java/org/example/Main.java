@@ -1,26 +1,28 @@
 package org.example;
 
-import Client.ClientService;
+import org.example.Client.ClientService;
 
 import java.sql.SQLException;
 
 public class Main {
-    public static void main(String[] args) throws SQLException {
-        DatabaseInitService initService = new DatabaseInitService();
-        initService.initDb("jdbc:h2:/Desktop/goit/h2/6", "sa", "");
+    public static void main(String[] args) {
+        ClientService clientService = new ClientService();
+        try {
+            long clientId = clientService.create("Test User");
+            System.out.println("Created client with ID: " + clientId);
+            String clientName = clientService.getById(clientId);
+            System.out.println("Client name: " + clientName);
 
-        ClientService service = new ClientService(Database.getInstance());
-        long idOfJohn = service.create("John");
-        System.out.println("AFTER CREATE: idOfJohn = " + idOfJohn);
+            clientService.setName(clientId, "Test User 1");
+            System.out.println("Client name updated.");
 
-        String nameOfJohn = service.getById(idOfJohn);
-        System.out.println("AFTER GET_BY_ID: nameOfJohn = " + nameOfJohn);
+            clientService.deleteById(clientId);
+            System.out.println("Client deleted.");
 
-        service.setName(idOfJohn, "JOHN");
-        System.out.println("AFTER SET_NAME: service.listAll() = " + service.listAll());
-
-        service.deleteById(idOfJohn);
-        System.out.println("AFTER SET_NAME: service.listAll() = " + service.listAll());
-
+            System.out.println("All clients:");
+            clientService.listAll().forEach(client -> System.out.println("ID: " + client.getId() + ", Name: " + client.getName()));
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
     }
+}

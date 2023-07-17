@@ -1,11 +1,8 @@
-package Client;
+package org.example.Client;
 
 import org.example.Database;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,18 +10,16 @@ public class ClientService {
     private Database database;
     private Connection connection;
     private PreparedStatement createSt;
-    private PreparedStatement getByNameSt;
     private PreparedStatement getByIdSt;
     private PreparedStatement setNameSt;
     private PreparedStatement deleteByIdSt;
     private PreparedStatement listAllSt;
 
-    public ClientService(Database database) {
-        this.database = database;
+    public ClientService() {
+        database = Database.getInstance();
         connection = database.getConnection();
         try {
-            createSt = connection.prepareStatement("INSERT INTO client(name) VALUES (?)");
-            getByNameSt = connection.prepareStatement("SELECT id FROM client WHERE name = ?");
+            createSt = connection.prepareStatement("INSERT INTO client(name) VALUES (?)", Statement.RETURN_GENERATED_KEYS);
             getByIdSt = connection.prepareStatement("SELECT name FROM client WHERE id = ?");
             setNameSt = connection.prepareStatement("UPDATE client SET name = ? WHERE id = ?");
             deleteByIdSt = connection.prepareStatement("DELETE FROM client WHERE id = ?");
@@ -37,40 +32,55 @@ public class ClientService {
     public long create(String name) throws SQLException {
         createSt.setString(1, name);
         createSt.executeUpdate();
-        getByNameSt.setString(1, name);
 
-        try (ResultSet rs = getByNameSt.executeQuery()) {
-            if (!rs.next()) {
-                throw new SQLException("Client creation failed.");
+        try (ResultSet generatedKeys = createSt.getGeneratedKeys()) {
+            if (generatedKeys.next()) {
+                return generatedKeys.getLong(1);
+            } else {
+                throw new SQLException("Creating client failed, no ID obtained.");
             }
-            long id = rs.getLong("id");
-            return id;
         }
     }
 
     public String getById(long id) throws SQLException {
         getByIdSt.setLong(1, id);
         try (ResultSet rs = getByIdSt.executeQuery()) {
-            if (!rs.next()) {
-                return null;
+            if (rs.next()) {
+                return rs.getString("name");
+            } else {
+                throw new SQLException("Client not found.");
             }
-            String name = rs.getString("name");
-            return name;
         }
     }
 
     public void setName(long id, String name) throws SQLException {
         setNameSt.setString(1, name);
         setNameSt.setLong(2, id);
-        setNameSt.executeUpdate();
+        int rowsAffected = 0;
+        try {
+            rowsAffected = setNameSt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        if (rowsAffected == 0) {
+            throw new SQLException("Updating client failed, no rows affected.");
+        }
     }
 
     public void deleteById(long id) throws SQLException {
         deleteByIdSt.setLong(1, id);
-        deleteByIdSt.executeUpdate();
+        int rowsAffected = 0;
+        try {
+            rowsAffected = deleteByIdSt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        if (rowsAffected == 0) {
+            throw new SQLException("Deleting client failed, no rows affected.");
+        }
     }
 
-    public List<Client> listAll() throws SQLException {
+    public List<Client> listAll()  {
         List<Client> clients = new ArrayList<>();
         try (ResultSet rs = listAllSt.executeQuery()) {
             while (rs.next()) {
@@ -79,6 +89,8 @@ public class ClientService {
                 Client client = new Client(id, name);
                 clients.add(client);
             }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
         return clients;
     }
